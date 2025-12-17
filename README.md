@@ -1,0 +1,1 @@
+# shopify-stok-sync
