@@ -11,46 +11,35 @@ const DEFAULT_CONFIG = {
   enabled: true,
   shopifyStore: "louur.myshopify.com",
   accessToken: "",
-  groups: {
-    "XS": ["I", "J", "K"],
-    "S": ["L", "M", "N"],
-    "M": ["O", "P", "R"],
-    "L": ["S", "T", "U"]
-  },
+  groups: { "XS": ["I", "J", "K"], "S": ["L", "M", "N"], "M": ["O", "P", "R"], "L": ["S", "T", "U"] },
   logs: []
 };
 
 function loadConfig() {
-  try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-    }
-  } catch (e) {}
+  try { if (fs.existsSync(CONFIG_PATH)) return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")); } catch (e) {}
   saveConfig(DEFAULT_CONFIG);
   return DEFAULT_CONFIG;
 }
 
-function saveConfig(config) {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-}
+function saveConfig(config) { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2)); }
 
-function addLog(message, type = "info") {
+function addLog(message, type) {
   const config = loadConfig();
-  config.logs.unshift({ timestamp: new Date().toISOString(), message, type });
+  config.logs.unshift({ timestamp: new Date().toISOString(), message: message, type: type || "info" });
   config.logs = config.logs.slice(0, 100);
   saveConfig(config);
 }
 
 function findGroup(size, groups) {
   for (const [name, sizes] of Object.entries(groups)) {
-    if (sizes.includes(size.toUpperCase())) return { name, sizes };
+    if (sizes.includes(size.toUpperCase())) return { name: name, sizes: sizes };
   }
   return null;
 }
 
-async function shopifyAPI(config, endpoint, method = "GET", body) {
-  const res = await fetch(`https://${config.shopifyStore}/admin/api/2024-01/${endpoint}`, {
-    method,
+async function shopifyAPI(config, endpoint, method, body) {
+  const res = await fetch("https://" + config.shopifyStore + "/admin/api/2024-01/" + endpoint, {
+    method: method || "GET",
     headers: { "X-Shopify-Access-Token": config.accessToken, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined
   });
@@ -59,46 +48,49 @@ async function shopifyAPI(config, endpoint, method = "GET", body) {
 
 app.use(express.json());
 
-const HTML = `<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LOUUR Stok Sync</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;color:#fff}
-.c{max-width:900px;margin:0 auto;padding:20px}
-h1{text-align:center;padding:30px 0;font-size:2.5em}
-.badge{display:inline-block;padding:8px 20px;border-radius:20px;font-weight:bold}
-.on{background:#00c853}.off{background:#ff5252}
-.card{background:rgba(255,255,255,0.05);border-radius:15px;padding:25px;margin:20px 0;border:1px solid rgba(255,255,255,0.1)}
-.card h2{margin-bottom:20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px}
-.group{background:rgba(255,255,255,0.08);border-radius:10px;padding:20px;text-align:center}
-.group h3{color:#ffd700;font-size:1.8em;margin-bottom:10px}
-.tag{background:#4a4a6a;padding:5px 12px;border-radius:15px;margin:3px;display:inline-block;font-size:0.9em}
-.btn{padding:12px 25px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px}
-.btn-p{background:#667eea;color:#fff}.btn-d{background:#ff5252;color:#fff}.btn-s{background:#00c853;color:#fff}
-input{width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;margin:10px 0}
-.logs{max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;font-family:monospace;font-size:0.8em}
-.log{padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1)}
-.info{color:#64b5f6}.success{color:#81c784}.error{color:#e57373}
-.wh{background:rgba(0,0,0,0.3);padding:15px;border-radius:8px;word-break:break-all;font-family:monospace;margin:15px 0}
-.flex{display:flex;justify-content:space-between;align-items:center}
-.toggle{position:relative;width:60px;height:34px}
-.toggle input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:34px;transition:.4s}
-.slider:before{content:"";position:absolute;height:26px;width:26px;left:4px;bottom:4px;background:#fff;border-radius:50%;transition:.4s}
-input:checked+.slider{background:#00c853}
-input:checked+.slider:before{transform:translateX(26px)}
-.msg{padding:15px;border-radius:8px;margin:15px 0;display:none}
-.msg.show{display:block}.msg.ok{background:rgba(0,200,83,0.2);border:1px solid #00c853}.msg.err{background:rgba(255,82,82,0.2);border:1px solid #ff5252}
-</style>
-</head>
-<body>
-<div class="c">
-<h1>💍 LOUUR</h1>
-<p style="text-align:center">Yüzük Stok Senkronizasyon</p>
-<p style="text-align:center;margin-top:15px"><span class="badge" id="st">...</span></p>
-<div id="msg" class="msg"></div>
-<div class="card"><div class="flex"><h2>⚙️ Sistem</h2><label class="toggle"><input type="checkbox"
+const HTML = '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LOUUR Stok</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;color:#fff}.c{max-width:900px;margin:0 auto;padding:20px}h1{text-align:center;padding:30px 0;font-size:2.5em}.badge{display:inline-block;padding:8px 20px;border-radius:20px;font-weight:bold}.on{background:#00c853}.off{background:#ff5252}.card{background:rgba(255,255,255,0.05);border-radius:15px;padding:25px;margin:20px 0;border:1px solid rgba(255,255,255,0.1)}.card h2{margin-bottom:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px}.group{background:rgba(255,255,255,0.08);border-radius:10px;padding:20px;text-align:center}.group h3{color:#ffd700;font-size:1.8em;margin-bottom:10px}.tag{background:#4a4a6a;padding:5px 12px;border-radius:15px;margin:3px;display:inline-block;font-size:0.9em}.btn{padding:12px 25px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px}.btn-p{background:#667eea;color:#fff}.btn-d{background:#ff5252;color:#fff}.btn-s{background:#00c853;color:#fff}input{width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;margin:10px 0}.logs{max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:10px;padding:15px;font-family:monospace;font-size:0.8em}.log{padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1)}.info{color:#64b5f6}.success{color:#81c784}.error{color:#e57373}.wh{background:rgba(0,0,0,0.3);padding:15px;border-radius:8px;word-break:break-all;font-family:monospace;margin:15px 0}.flex{display:flex;justify-content:space-between;align-items:center}.toggle{position:relative;width:60px;height:34px}.toggle input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:34px;transition:.4s}.slider:before{content:"";position:absolute;height:26px;width:26px;left:4px;bottom:4px;background:#fff;border-radius:50%;transition:.4s}input:checked+.slider{background:#00c853}input:checked+.slider:before{transform:translateX(26px)}.msg{padding:15px;border-radius:8px;margin:15px 0;display:none}.msg.show{display:block}.msg.ok{background:rgba(0,200,83,0.2);border:1px solid #00c853}.msg.err{background:rgba(255,82,82,0.2);border:1px solid #ff5252}</style></head><body><div class="c"><h1>💍 LOUUR</h1><p style="text-align:center">Yüzük Stok Senkronizasyon</p><p style="text-align:center;margin-top:15px"><span class="badge" id="st">...</span></p><div id="msg" class="msg"></div><div class="card"><div class="flex"><h2>⚙️ Sistem</h2><label class="toggle"><input type="checkbox" id="tog" onchange="tog()"><span class="slider"></span></label></div></div><div class="card"><h2>🔑 Token</h2><input type="password" id="tok" placeholder="Shopify Admin API Token"><button class="btn btn-p" onclick="saveTok()">Kaydet</button></div><div class="card"><h2>📦 Gruplar</h2><div class="grid" id="gr"></div><div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1)"><input id="gn" placeholder="Grup adı (XS, S, M...)" style="width:30%;display:inline-block"><input id="gs" placeholder="Bedenler (I, J, K)" style="width:50%;display:inline-block"><button class="btn btn-s" onclick="saveGr()">Ekle</button></div></div><div class="card"><h2>🔗 Webhook</h2><p>Shopify Admin → Settings → Notifications → Webhooks</p><div class="wh" id="wh"></div><button class="btn btn-p" onclick="copy()">Kopyala</button><p style="margin-top:10px;color:#888">Event: Order creation</p></div><div class="card"><div class="flex"><h2>📋 Loglar</h2><button class="btn btn-d" onclick="clr()">Temizle</button></div><div class="logs" id="logs"></div></div></div><script>let cfg={};async function load(){cfg=await(await fetch("/api/config")).json();upd()}function upd(){document.getElementById("st").textContent=cfg.enabled?"✅ Aktif":"⏸️ Pasif";document.getElementById("st").className="badge "+(cfg.enabled?"on":"off");document.getElementById("tog").checked=cfg.enabled;document.getElementById("tok").value=cfg.accessToken?"••••••••":"";document.getElementById("wh").textContent=location.origin+"/webhook/order";document.getElementById("gr").innerHTML=Object.entries(cfg.groups||{}).map(function(x){return\'<div class="group"><h3>\'+x[0]+\'</h3><div>\'+x[1].map(function(s){return\'<span class="tag">\'+s+"</span>"}).join("")+\'</div><button class="btn btn-d" style="margin-top:10px;padding:5px 15px" onclick="delGr(\\\'\'+x[0]+\'\\\')">Sil</button></div>\'}).join("");document.getElementById("logs").innerHTML=(cfg.logs||[]).map(function(l){return\'<div class="log \'+l.type+\'">\'+new Date(l.timestamp).toLocaleString("tr-TR")+" - "+l.message+"</div>"}).join("")||\'<p style="color:#888">Log yok</p>\'}async function sav(){await fetch("/api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)})}async function tog(){cfg.enabled=document.getElementById("tog").checked;await sav();msg(cfg.enabled?"Aktif":"Pasif","ok");upd()}async function saveTok(){var t=document.getElementById("tok").value;if(!t||t==="••••••••"){msg("Token girin","err");return}cfg.accessToken=t;await sav();msg("Kaydedildi","ok");upd()}async function saveGr(){var n=document.getElementById("gn").value.trim().toUpperCase();var s=document.getElementById("gs").value.split(",").map(function(x){return x.trim().toUpperCase()}).filter(function(x){return x});if(!n||!s.length){msg("Grup ve beden girin","err");return}cfg.groups[n]=s;await sav();document.getElementById("gn").value="";document.getElementById("gs").value="";msg(n+" eklendi","ok");upd()}async function delGr(n){if(!confirm(n+" silinsin mi?"))return;delete cfg.groups[n];await sav();msg("Silindi","ok");upd()}async function clr(){cfg.logs=[];await sav();upd()}function copy(){navigator.clipboard.writeText(document.getElementById("wh").textContent);msg("Kopyalandı","ok")}function msg(t,c){var m=document.getElementById("msg");m.textContent=t;m.className="msg show "+c;setTimeout(function(){m.className="msg"},3000)}load();setInterval(load,30000)</script></body></html>';
+
+app.get("/", function(req, res) { res.send(HTML); });
+app.get("/api/config", function(req, res) { res.json(loadConfig()); });
+app.post("/api/config", function(req, res) { saveConfig(req.body); res.json({ ok: true }); });
+
+app.post("/webhook/order", async function(req, res) {
+  res.status(200).send("OK");
+  var config = loadConfig();
+  if (!config.enabled || !config.accessToken) { addLog("Sistem pasif veya token yok", "info"); return; }
+  
+  try {
+    var order = req.body;
+    addLog("Sipariş #" + (order.order_number || order.id), "info");
+    
+    for (var i = 0; i < (order.line_items || []).length; i++) {
+      var item = order.line_items[i];
+      var size = (item.variant_title || "").trim().toUpperCase();
+      var group = findGroup(size, config.groups);
+      
+      if (group) {
+        addLog(item.title + " - " + size + " satıldı (" + group.name + ")", "info");
+        var prod = await shopifyAPI(config, "products/" + item.product_id + ".json");
+        var others = group.sizes.filter(function(s) { return s !== size; });
+        
+        for (var j = 0; j < (prod.product?.variants || []).length; j++) {
+          var v = prod.product.variants[j];
+          if (others.includes((v.title || "").trim().toUpperCase())) {
+            var locs = await shopifyAPI(config, "locations.json");
+            var loc = locs.locations?.[0]?.id;
+            if (loc) {
+              await shopifyAPI(config, "inventory_levels/adjust.json", "POST", {
+                location_id: loc,
+                inventory_item_id: v.inventory_item_id,
+                available_adjustment: -(item.quantity || 1)
+              });
+              addLog("✅ " + v.title + " stoku düşürüldü", "success");
+            }
+          }
+        }
+      }
+    }
+  } catch (e) { addLog("❌ Hata: " + e.message, "error"); }
+});
+
+app.listen(PORT, function() { console.log("Server running on port " + PORT); });
